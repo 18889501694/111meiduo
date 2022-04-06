@@ -1,0 +1,4 @@
+#模板 指定字段
+{{object.name}}
+{{object.caption}}
+{{object.id}}
