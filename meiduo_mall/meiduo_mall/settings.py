@@ -157,7 +157,7 @@ CACHES = {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         }
     },
-    'code': {
+    'code': {  # 保存验证码数据
         'BACKEND': 'django_redis.cache.RedisCache',
         'LOCATION': 'redis://175.178.152.43:6379/2',
         'OPTIONS': {
@@ -167,6 +167,13 @@ CACHES = {
     'history': {  # 保存浏览记录数据
         'BACKEND': 'django_redis.cache.RedisCache',
         'LOCATION': 'redis://175.178.152.43:6379/3',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    },
+    'carts': {  # 购物车数据
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://175.178.152.43:6379/4',
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         }
