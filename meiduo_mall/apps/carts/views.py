@@ -11,20 +11,28 @@ from apps.goods.models import SKU
 
 class CartsView(View):
     """
-    1、添加购物车
-    2、购物车的展示
+    1、购物车添加（增）
+    2、购物车的展示（查）
+    3、购物车的修改（改）
+    4、购物车的删除（删）
     """
 
     def post(self, request):
         """
         1、接收数据  2、验证数据
         3、判断用户的登录状态（request.user关联User的模型数据 用is_authenticated=True来验证用户 False是匿名用户）
-
-        4、登录用户购物车保存redis：1、连接redis 2、操作hash 3、操作set 4、返回响应
-                                redis中hash用法 :redis_cli.hset(key,field,value)  set的用法:redis_cli.sadd(key,field)
-
-        5、未登录用户保存cookie：1、先读取cookie数据进行判断   2、先有cookie字典    3、字典转换为bytes
-                    4、bytes类型数据base64编码(base64encode.decode()的作用是将bytes类型转换为str) 5、设置cookie  6、返回响应
+        4、登录用户购物车保存redis：
+            ①、连接redis
+            ②、操作hash:redis_cli.hset(key,field,value)
+            ③、操作set :redis_cli.sadd(key,field)
+            ④、返回响应
+        5、未登录用户保存cookie：
+            ①、先读取cookie数据进行判断
+            ②、先有cookie字典
+            ③、字典转换为bytes
+            ④、bytes类型数据base64编码(base64encode.decode()的作用是将bytes类型转换为str)
+            ⑤、设置cookie
+            ⑥、返回响应
         """
         data = json.loads(request.body.decode())
         sku_id = data.get('sku_id')
@@ -101,8 +109,57 @@ class CartsView(View):
                 'price': sku.price,
                 'name': sku.name,
                 'default_image_url': sku.default_image.url,
-                'selected': carts[sku.id]['selected'],
-                'count': carts[sku.id]['count'],
-                'amount': sku.price * carts[sku.id]['count'],
+                'selected': carts[sku.id]['selected'],  # 选中状态
+                'count': int(carts[sku.id]['count']),  # 数量强制转换int
+                'amount': sku.price * carts[sku.id]['count'],  # 总价格
             })
         return JsonResponse({'code': 0, 'errmsg': 'ok', 'cart_skus': sku_list})
+
+    def put(self, request):
+        """
+        1、获取用户信息    2、接收数据      3、验证数据
+        4、登录用户更新redis（1、连接redis 2、hash  3、set  4、返回响应）
+        5、未登录用户更新cookie
+        """
+        user = request.user
+        data = json.loads(request.body.decode())
+        sku_id = data.get('sku_id')
+        count = data.get('count')
+        selected = data.get('selected')
+
+        if not all([sku_id, count]):
+            return JsonResponse({'code': 400, 'errmsg': '参数不全'})
+        try:
+            SKU.objects.get(id=sku_id)
+        except SKU.DoesNotExist:
+            return JsonResponse({'code': 400, 'errmsg': '没有响应'})
+
+        try:
+            count = int(count)
+        except Exception:
+            count = 1
+
+        if user.is_authenticated:
+            redis_cli = get_redis_connection('carts')
+            redis_cli.hset('carts_%s' % user.id, sku_id, count)
+            if selected:
+                redis_cli.sadd('selected_%s' % user.id, sku_id)
+            else:
+                redis_cli.srem('selected_%s' % user.id, sku_id)
+            return JsonResponse({'code': 0, 'errmsg': 'ok', 'cart_sku': {'count': count, 'selected': selected}})
+        else:
+            cookie_carts = request.COOKIES.get('carts')
+            if cookie_carts:
+                carts = pickle.loads(base64.b64decode(cookie_carts))
+            else:
+                carts = {}
+
+        if sku_id in carts:
+            carts[sku_id] = {'count': count, 'selected': selected}
+        new_carts = base64.b64encode(pickle.dumps(carts))
+        response = JsonResponse({'code': 0, 'errmsg': 'ok', 'cart_sku': {'count': count, 'selected': selected}})
+        response.set_cookie('carts', new_carts.decode(), max_age=14 * 24 * 3600)
+        return response
+
+    def delete(self, request):
+        pass
