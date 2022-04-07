@@ -105,6 +105,10 @@ class LoginView(View):
         response = JsonResponse({'code': 0, 'errmsg': 'ok'})
         response.set_cookie('username', username)  # 为了首页显示用户信息
 
+        # 必须是登录后合并
+        from apps.carts.utils import merge_cookie_to_redis
+        response = merge_cookie_to_redis(request, response)
+
         return response
 
 
