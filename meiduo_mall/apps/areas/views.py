@@ -8,6 +8,7 @@ class AreaView(View):
 
     def get(self, request):
         """
+        优化
         0.先看缓存有没有数据，如果有就直接返回json，没有的话就进行if判断查询
         1.查询省份信息（查询结果集）
         2.将对象转换为字典数据（对象不能直接返回json，要先转成字典）

@@ -11,7 +11,7 @@ from apps.goods.models import SKU
 
 class CartsView(View):
     """
-    1、购物车添加（增）
+    1、购物车的添加（增）
     2、购物车的展示（查）
     3、购物车的修改（改）
     4、购物车的删除（删）
@@ -52,8 +52,13 @@ class CartsView(View):
         user = request.user
         if user.is_authenticated:
             redis_cli = get_redis_connection('carts')
-            redis_cli.hset('carts_%s' % user.id, sku_id, count)
+
+            pipeline = redis_cli.pipeline()  # redis管道优化 提高性能
+
+            # redis_cli.hset('carts_%s' % user.id, sku_id, count)
+            redis_cli.hincrby('carts_%s' % user.id, sku_id, count)
             redis_cli.add('selected_%s' % user.id, sku_id)
+            pipeline.execute()
             return JsonResponse({'code': 0, 'errmsg': 'ok'})
         else:
             cookie_carts = request.COOKIES.get('carts')
@@ -72,6 +77,7 @@ class CartsView(View):
             base64encode = base64.b64encode(carts_bytes)
             response = JsonResponse({'code': 0, 'errmsg': 'ok'})
             response.set_cookie('carts', base64encode.decode(), max_age=3600 * 24 * 12)
+
             return response
 
     def get(self, request):
@@ -90,7 +96,7 @@ class CartsView(View):
             carts = {}
 
             for sku_id, count in sku_id_counts.items():
-                carts[sku_id] = {'count': count, 'selected': sku_id in selected_ids}  # 结果是True或是FALSE
+                carts[sku_id] = {'count': int(count), 'selected': sku_id in selected_ids}  # 结果是True或是FALSE
             else:
                 cookie_carts = request.COOKIES.get('carts')
                 if cookie_carts:
@@ -141,12 +147,13 @@ class CartsView(View):
 
         if user.is_authenticated:
             redis_cli = get_redis_connection('carts')
-            redis_cli.hset('carts_%s' % user.id, sku_id, count)
+            # redis_cli.hset('carts_%s' % user.id, sku_id, count)
+            pipeline = redis_cli.pipeline()  # redis管道优化 提高性能
             if selected:
                 redis_cli.sadd('selected_%s' % user.id, sku_id)
             else:
                 redis_cli.srem('selected_%s' % user.id, sku_id)
-            return JsonResponse({'code': 0, 'errmsg': 'ok', 'cart_sku': {'count': count, 'selected': selected}})
+            return JsonResponse({'code': 0, 'errmsg': 'ok', 'cart_sku': {'count': int(count), 'selected': selected}})
         else:
             cookie_carts = request.COOKIES.get('carts')
             if cookie_carts:
@@ -159,6 +166,7 @@ class CartsView(View):
         new_carts = base64.b64encode(pickle.dumps(carts))
         response = JsonResponse({'code': 0, 'errmsg': 'ok', 'cart_sku': {'count': count, 'selected': selected}})
         response.set_cookie('carts', new_carts.decode(), max_age=14 * 24 * 3600)
+
         return response
 
     def delete(self, request):
