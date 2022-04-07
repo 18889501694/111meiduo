@@ -233,24 +233,24 @@ class AddressCreateView(LoginRequiredJSONMixin, View):
             title=receiver,
             receiver=receiver,
             province_id=province_id,
-            city_id=city_id,
             district_id=district_id,
-            place=place,
+            city_id=city_id,
             mobile=mobile,
-            tel=tel,
+            place=place,
             email=email,
+            tel=tel,
         )
         address_dict = {
             'id': address.id,
             'title': address.title,
             'receiver': address.receiver,
             'province': address.province.name,
-            'city': address.city.name,
             'district': address.district.name,
-            'place': address.place,
+            'city': address.city.name,
             'mobile': address.mobile,
-            'tel': address.tel,
+            'place': address.place,
             'email': address.email,
+            'tel': address.tel,
         }
 
         return JsonResponse({'code': 0, 'errmsg': 'ok', 'address': address_dict})
