@@ -162,4 +162,33 @@ class CartsView(View):
         return response
 
     def delete(self, request):
-        pass
+        """
+        1、接收请求  2、验证参数  3、提供用户状态
+        4、登录用户操作redis（1、连接redis  2、hash  3、set  4、返回响应）
+        5、未登录用户操作cookie（1、判断数据是否存在，存在则解码不存在则空 2、删除数据 3、对字典数据编码和base64 4、设置cookie）
+        """
+        data = json.loads(request.body.decode())
+        sku_id = data.get('sku_id')
+        try:
+            SKU.objects.get(id=sku_id)
+        except SKU.DoesNotExist:
+            return JsonResponse({'code': 400, 'errmsg': '没有此商品'})
+
+        user = request.user
+        if user.is_authenticated:
+            redis_cli = get_redis_connection('carts')
+            redis_cli.hdel('carts_%s' % user.id, sku_id)
+            redis_cli.srem('selected_%s' % user.id, sku_id)
+            return JsonResponse({'code': 0, 'errmsg': 'ok'})
+        else:
+            cookie_carts = request.COOKIES.get('carts')
+            if cookie_carts:
+                carts = pickle.loads(base64.b64decode(cookie_carts))
+            else:
+                carts = {}
+            del carts[sku_id]
+            new_carts = base64.b64encode(pickle.dumps(carts))
+            response = JsonResponse({'code': 0, 'errmsg': 'ok'})
+            response.set_cookie('carts', new_carts.decode(), max_age=14 * 24 * 3600)
+
+            return response
