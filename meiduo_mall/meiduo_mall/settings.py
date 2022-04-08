@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'apps.goods',
     'apps.contents',
     'apps.carts',
+    'apps.orders'
     'django_crontab',  # 定时任务
     'corsheaders',  # CORS第一步
     'haystack',  # 扩展搜索引擎的插件

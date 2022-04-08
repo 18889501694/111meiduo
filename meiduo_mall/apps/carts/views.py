@@ -23,14 +23,14 @@ class CartsView(View):
         3、判断用户的登录状态（request.user关联User的模型数据 用is_authenticated=True来验证用户 False是匿名用户）
         4、登录用户购物车保存redis：
             ①、连接redis
-            ②、操作hash:redis_cli.hset(key,field,value)
-            ③、操作set :redis_cli.sadd(key,field)
+            ②、操作hash:   redis_cli.hset(key,field,value)
+            ③、操作set :   redis_cli.sadd(key,field)
             ④、返回响应
         5、未登录用户保存cookie：
             ①、先读取cookie数据进行判断
             ②、先有cookie字典
             ③、字典转换为bytes
-            ④、bytes类型数据base64编码(base64encode.decode()的作用是将bytes类型转换为str)
+            ④、bytes类型数据进行base64编码(base64encode.decode()的作用是将bytes类型转换为str)
             ⑤、设置cookie
             ⑥、返回响应
         """
@@ -57,7 +57,7 @@ class CartsView(View):
 
             # redis_cli.hset('carts_%s' % user.id, sku_id, count)
             redis_cli.hincrby('carts_%s' % user.id, sku_id, count)
-            redis_cli.add('selected_%s' % user.id, sku_id)
+            redis_cli.sadd('selected_%s' % user.id, sku_id)
             pipeline.execute()
             return JsonResponse({'code': 0, 'errmsg': 'ok'})
         else:
@@ -74,7 +74,7 @@ class CartsView(View):
 
             carts[sku_id] = {'count': count, 'selected': True}
             carts_bytes = pickle.dumps(carts)
-            base64encode = base64.b64encode(carts_bytes)
+            base64encode = base64.b64encode(carts_bytes)  # cookie保存的数据类型是字符串
             response = JsonResponse({'code': 0, 'errmsg': 'ok'})
             response.set_cookie('carts', base64encode.decode(), max_age=3600 * 24 * 12)
 
@@ -91,22 +91,22 @@ class CartsView(View):
         user = request.user
         if user.is_authenticated:
             redis_cli = get_redis_connection('carts')
-            sku_id_counts = redis_cli.hgethall('carts_%s' % user.id)
-            selected_ids = redis_cli.smembers('selected_%s' % user.id)
+            sku_id_counts = redis_cli.hgethall('carts_%s' % user.id)  # 获取购物车中所有的商品id
+            selected_ids = redis_cli.smembers('selected_%s' % user.id)  # 选中商品信息
             carts = {}
 
             for sku_id, count in sku_id_counts.items():
                 carts[sku_id] = {'count': int(count), 'selected': sku_id in selected_ids}  # 结果是True或是FALSE
+        else:
+            cookie_carts = request.COOKIES.get('carts')
+            if cookie_carts:
+                carts = pickle.loads(base64.b64decode(cookie_carts))  # 将购物车cookie数据从字符串转换成字典
             else:
-                cookie_carts = request.COOKIES.get('carts')
-                if cookie_carts:
-                    carts = pickle.loads(base64.b64decode(cookie_carts))
-                else:
-                    carts = {}
+                carts = {}
 
         sku_ids = carts.keys()
         # 可以遍历查询 也可以使用in查询
-        skus = SKU.objects.filter(id__in=sku_ids)
+        skus = SKU.objects.filter(id__in=sku_ids)  # 获取所有商品id
 
         sku_list = []
         for sku in skus:
@@ -152,7 +152,7 @@ class CartsView(View):
             if selected:
                 redis_cli.sadd('selected_%s' % user.id, sku_id)
             else:
-                redis_cli.srem('selected_%s' % user.id, sku_id)
+                redis_cli.srem('selected_%s' % user.id, sku_id)  # srem移除
             return JsonResponse({'code': 0, 'errmsg': 'ok', 'cart_sku': {'count': int(count), 'selected': selected}})
         else:
             cookie_carts = request.COOKIES.get('carts')
