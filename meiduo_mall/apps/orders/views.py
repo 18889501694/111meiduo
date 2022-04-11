@@ -168,7 +168,7 @@ class OrderCommitView(LoginRequiredJSONMixin, View):
                     # transaction.savepoint_rollback(point)
                     # return JsonResponse({'code': 400, 'errmsg': '下单失败-------'})
 
-                orderinfo.total_count += cout
+                orderinfo.total_count += count
                 orderinfo.total_amount += (count * sku.price)
 
                 from apps.orders.models import OrderGoods

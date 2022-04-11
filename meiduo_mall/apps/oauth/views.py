@@ -13,6 +13,7 @@ from QQLoginTool.QQtool import OAuthQQ
 
 
 class QQLoginURLView(View):
+    """第三方QQ登录"""
 
     def get(self, request):
         """
@@ -30,6 +31,7 @@ class QQLoginURLView(View):
 
 
 class OauthQQView(View):
+    """绑定第三方QQ"""
 
     def get(self, request):
         """
@@ -38,7 +40,9 @@ class OauthQQView(View):
         3.再通过token换取openid
         4.根据openid进行判断
         5.如果没有绑定过，则需要绑定
-        6.如果绑定过，则直接登录 6.1设置session 6.2设置cookie
+        6.如果绑定过，则直接登录
+        6.1设置session
+        6.2设置cookie
         """
         code = request.GET.get('code')
         if code is None:

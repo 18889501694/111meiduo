@@ -16,6 +16,7 @@ from celery_tasks.email.tasks import celery_send_email
 
 
 class UsernameCountView(View):
+    """用户名重复注册"""
 
     def get(self, request, username):
         """
@@ -30,6 +31,7 @@ class UsernameCountView(View):
 
 
 class RegisterView(View):
+    """用户注册"""
 
     def post(self, request):
         """
@@ -69,6 +71,7 @@ class RegisterView(View):
 
 
 class LoginView(View):
+    """用户登录"""
 
     def post(self, request):
         """
@@ -113,6 +116,7 @@ class LoginView(View):
 
 
 class LogoutView(View):
+    """用户退出"""
 
     def delete(self, request):
         # 删除session信息，前端根据cookie信息来判断用户是否登录
@@ -124,6 +128,7 @@ class LogoutView(View):
 
 
 class CenterView(LoginRequiredJSONMixin, View):
+    """用户中心"""
 
     def get(self, request):
         """
@@ -143,6 +148,7 @@ class CenterView(LoginRequiredJSONMixin, View):
 
 
 class EmailsView(View):
+    """发送邮件"""
 
     def put(self, request):
         """
@@ -189,10 +195,11 @@ class EmailsView(View):
 
 
 class EmailVerifyView(View):
+    """邮箱验证"""
 
     def put(self, request):
         """
-        1.接收请求 2.获取参数 3.验证参数 4.获取user_id 5.根据用户id查询数据 7.返回响应json
+        1.接收请求 2.获取参数 3.验证参数 4.获取user_id 5.根据用户id查询数据库 7.返回响应json
         """
         params = request.GET
         token = params.get('token')
@@ -321,7 +328,7 @@ class UserHistoryView(LoginRequiredJSONMixin, View):
         1、连接redis
         2、获取redis数据
         3、根据商品id进行数据查询
-        4、将对象转换为字典
+        4、将对象转换为字典（序列化）
         5、返回json
         """
         redis_cli = get_redis_connection('history')

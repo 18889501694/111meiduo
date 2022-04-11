@@ -9,6 +9,7 @@ from random import randint
 
 
 class ImageCodeView(View):
+    """图片验证码"""
 
     def get(self, request, uuid):
         """
@@ -28,6 +29,7 @@ class ImageCodeView(View):
 
 
 class SmsCodeView(View):
+    """短信验证码"""
 
     def get(self, request, mobile):
         """
