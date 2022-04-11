@@ -3,6 +3,7 @@ import json
 from django.http import JsonResponse
 from django.views import View
 from django_redis import get_redis_connection
+from django.db import transaction
 
 from apps.goods.models import SKU
 from apps.orders.models import OrderInfo
@@ -65,12 +66,12 @@ class OrderSettlementView(View):
         return JsonResponse({'code': 0, 'errmsg': 'ok', 'context': context})
 
 
-class OrderCommitView(View):
+class OrderCommitView(LoginRequiredJSONMixin, View):
     """订单基本信息保存"""
 
     def post(self, request):
         """
-         1、接收请求     2、验证数据      3.数据入库（先入订单基本信息，再入订单商品信息）      3.2获取hash       3.3获取set
+         1、接收请求     2、验证数据      3.数据入库（先入订单基本信息，  再入订单商品信息）      3.2获取hash       3.3获取set
          3.4遍历选中商品的id，最好重写组织一个数据·这个数据是选中的商品信息{sku_id:count , sku_id;count}
          3.5遍历根据选中商品的id进行查询
          3.6判断库存是否充足
@@ -114,15 +115,69 @@ class OrderCommitView(View):
         total_amount = Decimal('0')  # 总金额
         freight = Decimal('10.00')
 
-        # 数据入库，生成订单(订单基本信息表和订单商品信息表)
-        # 先保存订单基本信息
-        OrderInfo.objects.create(
-            order_id=order_id,
-            user=user,
-            address=address,
-            total_count=total_amount,
-            total_amount=total_amount,
-            freight=freight,
-            pay_method=pay_method,
-            status=status,
-        )
+        with transaction.atomic():
+            point = transaction.savepoint()  # 事务开始点（回滚点）
+
+            # 数据入库，生成订单(订单基本信息表和订单商品信息表)
+            # 先保存订单基本信息
+            orderinfo = OrderInfo.objects.create(
+                order_id=order_id,
+                user=user,
+                address=address,
+                total_count=total_amount,
+                total_amount=total_amount,
+                freight=freight,
+                pay_method=pay_method,
+                status=status,
+            )
+
+            redis_cli = get_redis_connection('carts')
+            sku_id_counts = redis_cli.hgetall('carts_%s' % user.id)
+            selected_ids = redis_cli.smembers('selected_%s' % user.id)
+            carts = {}
+
+            for sku_id in selected_ids:
+                carts[int(sku_id)] = int(sku_id_counts[sku_id])
+
+            for sku_id, count in carts.items():
+                # for i in range(10): 优化乐观锁
+                sku = SKU.objects.get(id=sku_id)
+
+                if sku.stock < count:
+                    # 回滚点
+                    transaction.savepoint_rollback(point)
+                    return JsonResponse({'code': 400, 'errmsg': '库存不足'})
+
+                from time import sleep
+                sleep(7)
+                # sku.stock -= count
+                # sku.sales += count
+                # sku.save()
+
+                # -----乐观锁解决超卖问题------
+                old_stock = sku.stock  # 旧库存
+                new_stock = sku.stock - count
+                new_sales = sku.sales + count
+                result = SKU.objects.filter(id=sku_id, stock=old_stock).update(stock=new_stock, sales=new_sales)
+
+                # 如果result=1表示有1条记录修改成功，result=0 表示没有更新
+                if result == 0:
+                    # sleep(0.005) 优化乐观锁
+                    continue
+                    # # 暂时回滚和返回下单失败
+                    # transaction.savepoint_rollback(point)
+                    # return JsonResponse({'code': 400, 'errmsg': '下单失败-------'})
+
+                orderinfo.total_count += cout
+                orderinfo.total_amount += (count * sku.price)
+
+                from apps.orders.models import OrderGoods
+                OrderGoods.objects.create(
+                    order=orderinfo,
+                    sku=sku,
+                    count=count,
+                    price=sku.price,
+                )
+            orderinfo.save()
+            transaction.savepoint_commit(point)
+        return JsonResponse({'code': 0, 'errmsg': 'ok', 'order_id': order_id})
