@@ -80,7 +80,7 @@ class OrderCommitView(LoginRequiredJSONMixin, View):
          3.9累加总和总金额
          3.10保存订单商品信息
          4.更新订单的总金额和总敦量
-         5.将redis中选中的商品信息移除出去
+         5.将选中的商品信息从redis中移除出去
          6、返回响应
         """
         user = request.user
